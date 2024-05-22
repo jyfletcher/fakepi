@@ -1,0 +1,546 @@
+#!/usr/bin/env python3
+
+# Usage:
+# Add the CherryPy dependency. Documentation here: https://cherrypy.dev/
+# And then run the program with python3
+# $ python3 fakepi.py
+# Then connect an API client (or web browser) to http://127.0.0.1:8181/
+# Note the port number and listen address are hard coded. Check the main()
+# function to change them.
+#
+# Origin: https://github.com/jyfletcher/fakepi
+# 
+# Copyright (C) 2022-2024 Justin Yates Fletcher
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program. If not, see <https://www.gnu.org/licenses/>.
+
+import cherrypy
+import random
+import string
+
+def gendata():
+    print("Generating company, customer, employee and product data.")
+    
+    company_ids = random.sample(range(10000,100000), 100)
+    product_ids = random.sample(range(10000,100000), 100)
+    employee_ids = random.sample(range(10000,100000), 100)
+    customer_ids = random.sample(range(10000,100000), 100)
+
+    for cid in company_ids:
+        comp = company_template.copy()
+        comp["Address"] = company_template["Address"].copy()
+        lname = random.choice(lastnames)
+        comp["Name"] = comp["Name"] % (lname, random.choice(company_types))
+        comp["CompanyID"] = comp["CompanyID"] % cid
+        comp["Address"]["Street"] = comp["Address"]["Street"] % lname
+        comp["Address"]["City"] = comp["Address"]["City"] % lname
+        comp["Address"]["Post"] = comp["Address"]["Post"] % cid
+        comp["Country"] = comp["Country"] % random.choice(countries)
+        companies.append(comp)
+
+    for pid in product_ids:
+        pro = product_template.copy()
+        pro["ProductID"] = pro["ProductID"] % pid
+        pro["Name"] = pro["Name"] % pid
+        pro["CompanyID"] = pro["CompanyID"] % random.choice(company_ids)
+        pro["Category"] = pro["Category"] % categories[pid % len(categories)]
+        pro["Price"] = pro["Price"] % str(random.randrange(5, 1000) + .99)
+        products.append(pro)
+
+    print("Ensuring all companies have at least one product.")
+    for c in companies:
+        if c["CompanyID"] not in [p["CompanyID"] for p in products]:
+            pro = product_template.copy()
+            pid = max(product_ids) + 1
+            product_ids.append(pid)
+            pro["ProductID"] = pro["ProductID"] % pid
+            pro["Name"] = pro["Name"] % pid
+            pro["CompanyID"] = pro["CompanyID"] % c["CompanyID"]
+            cat = random.choice(categories)
+            pro["Category"] = pro["Category"] % cat
+            pro["Price"] = pro["Price"] % str(random.randrange(5, 1000) + .99)
+            products.append(pro)
+            
+        
+    for eid in employee_ids:
+        emp = employee_template.copy()
+        emp["EmployeeID"] = emp["EmployeeID"] % eid
+        fname = random.choice(firstnames)
+        lname = random.choice(lastnames)
+        emp["FullName"] = emp["FullName"] % (fname, lname)
+        emp["Age"] = emp["Age"] % (random.randrange(20, 81))
+        emp["Country"] = emp["Country"] % random.choice(countries)
+        emp["Salary"] = emp["Salary"] % random.randrange(20000, 100000)
+        cid = random.choice(companies)["CompanyID"]
+        emp["CompanyID"] = emp["CompanyID"] % cid
+        employees.append(emp)
+
+
+    for cid in customer_ids:
+        cus = customer_template.copy()
+        cus["CustomerID"] = cus["CustomerID"] % cid
+        fname = random.choice(firstnames)
+        lname = random.choice(lastnames)
+        cus["FullName"] = cus["FullName"] % (fname, lname)
+        cus["Age"] = cus["Age"] % random.randrange(20, 80)
+        prods = [p["ProductID"] for p in
+                 random.choices(products, k=random.randrange(2, 10))]
+        cus["OwnedProducts"] = prods
+        customers.append(cus)
+
+class Root(object):
+    
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def index(self):
+        return {"Hello": "World!"}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def company(self, companyid=""):
+        if not companyid:
+            return companies
+        ret = [c for c in companies if c["CompanyID"] == companyid]
+        if len(ret) > 0: return ret
+        cherrypy.response.status = 404
+        return {"404": "Not found"}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def product(self, productid="", companyid=""):
+        if not productid and not companyid:
+            return products
+        if productid and not companyid:
+            ret = [p for p in products if p["ProductID"] == productid]
+            if len(ret) > 0: return ret
+        elif not productid and companyid:
+            ret = [p for p in products if p["CompanyID"] == companyid]
+            if len(ret) > 0: return ret
+        elif productid and companyid:
+            ret = [p for p in products
+                   if p["ProductID"] == productid
+                   and p["CompanyID"] == companyid]
+            if len(ret) > 0: return ret
+        cherrypy.response.status = 404
+        return {"404": "Not found"}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def employee(self, employeeid="", companyid=""):
+        if not employeeid and not companyid:
+            return employees
+        if not employeeid and companyid:
+            ret = [e for e in employees if e["CompanyID"] == companyid]
+            if len(ret) > 0: return ret
+        elif employeeid and companyid:
+            ret = [e for e in employees
+                   if e["EmployeeID"] == employeeid
+                   and e["CompanyID"] == companyid]
+            if len(ret) > 0: return ret
+        elif employeeid and not companyid:
+            ret = [e for e in employees if e["EmployeeID"] == employeeid]
+            if len(ret) > 0: return ret
+        cherrypy.response.status = 404
+        return {"404": "Not found"}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def customer(self, customerid="", productid="", name=""):
+        if not customerid and not productid and not name:
+            return customers
+        elif customerid and not productid and not name:
+            ret = [c for c in customers if c["CustomerID"] == customerid]
+            if len(ret) > 0: return ret
+        elif not customerid and productid and not name:
+            ret = [c for c in customers if productid in c["OwnedProducts"]]
+            if len(ret) > 0: return ret
+        elif customerid and productid and not name:
+            ret = [c for c in customers
+                   if productid in c["OwnedProducts"]
+                   and c["CustomerID"] == customerid]
+            if len(ret) > 0: return ret
+        elif not customerid and not productid and name:
+            ret = [c for c in customers
+                   if name.lower() in c["FullName"].lower()]
+            if len(ret) > 0: return ret
+        elif customerid and not productid and name:
+            ret = [c for c in customers
+                   if c["CustomerID"] == customerid
+                   and name.lower() in c["FullName"].lower()]
+            if len(ret) > 0: return ret
+        elif not customerid and productid and name:
+            ret = [c for c in customers
+                   if productid in c["OwnedProducts"]
+                   and name.lower() in c["FullName"].lower()]
+            if len(ret) > 0: return ret
+        elif customerid and productid and name:
+            ret = [c for c in customers
+                   if productid in c["OwnedProducts"]
+                   and c["CustomerID"] == customerid
+                   and name.lower() in c["FullName"].lower()]
+            if len(ret) > 0: return ret
+        cherrypy.response.status = 404
+        return {"404": "Not found"}
+
+def main():
+    gendata()
+    cherrypy.server.socket_host = '127.0.0.1'
+    cherrypy.server.socket_port = 8181
+    cherrypy.quickstart(Root())
+
+firstnames=[
+    "Michael",
+    "Christopher",
+    "Jessica",
+    "Matthew",
+    "Ashley",
+    "Jennifer",
+    "Joshua",
+    "Amanda",
+    "Daniel",
+    "David",
+    "James",
+    "Robert",
+    "John",
+    "Joseph",
+    "Andrew",
+    "Ryan",
+    "Brandon",
+    "Jason",
+    "Justin",
+    "Sarah",
+    "William",
+    "Jonathan",
+    "Stephanie",
+    "Brian",
+    "Nicole",
+    "Nicholas",
+    "Anthony",
+    "Heather",
+    "Eric",
+    "Elizabeth",
+    "Adam",
+    "Megan",
+    "Melissa",
+    "Kevin",
+    "Steven",
+    "Thomas",
+    "Timothy",
+    "Christina",
+    "Kyle",
+    "Rachel",
+    "Laura",
+    "Lauren",
+    "Amber",
+    "Brittany",
+    "Danielle",
+    "Richard",
+    "Kimberly",
+    "Jeffrey",
+    "Amy",
+    "Crystal",
+    "Michelle",
+    "Tiffany",
+    "Jeremy",
+    "Benjamin",
+    "Mark",
+    "Emily",
+    "Aaron",
+    "Charles",
+    "Rebecca",
+    "Jacob",
+    "Stephen",
+    "Patrick",
+    "Sean",
+    "Erin",
+    "Zachary",
+    "Jamie",
+    "Kelly",
+    "Samantha",
+    "Nathan",
+    "Sara",
+    "Dustin",
+    "Paul",
+    "Angela",
+    "Tyler",
+    "Scott",
+    "Katherine",
+    "Andrea",
+    "Gregory",
+    "Erica",
+    "Mary",
+    "Travis",
+    "Lisa",
+    "Kenneth",
+    "Bryan",
+    "Lindsey",
+    "Kristen",
+    "Jose",
+    "Alexander",
+    "Jesse",
+    "Katie",
+    "Lindsay",
+    "Shannon",
+    "Vanessa",
+    "Courtney",
+    "Christine",
+    "Alicia",
+    "Cody",
+    "Allison",
+    "Bradley",
+    "Samuel",
+    "Shawn",
+    "April",
+    "Derek",
+    "Kathryn",
+    "Kristin",
+    "Chad",
+    "Jenna",
+    "Tara",
+    "Maria",
+    "Krystal",
+    "Jared",
+    "Anna",
+    "Edward",
+    "Julie",
+    "Peter",
+    "Holly",
+    "Marcus",
+    "Kristina",
+    "Natalie",
+    "Jordan",
+    "Victoria",
+    "Jacqueline",
+    "Corey",
+    "Keith",
+    "Monica",
+    "Juan",
+    "Donald",
+    "Cassandra",
+    "Meghan",
+    "Joel",
+    "Shane",
+    "Phillip",
+    "Patricia",
+    "Brett",
+    "Ronald",
+    "Catherine",
+    "George",
+    "Antonio",
+    "Cynthia",
+    "Stacy",
+    "Kathleen",
+    "Raymond",
+    "Carlos",
+    "Brandi",
+    "Douglas",
+    "Nathaniel",
+    "Ian",
+    "Craig",
+    "Brandy",
+    "Alex"]
+
+lastnames = [
+    "Chung",
+    "Chen",
+    "Melton",
+    "Hill",
+    "Puckett",
+    "Song",
+    "Hamilton",
+    "Bender",
+    "Wagner",
+    "McLaughlin",
+    "McNamara",
+    "Raynor",
+    "Moon",
+    "Woodard",
+    "Desai",
+    "Wallace",
+    "Lawrence",
+    "Griffin",
+    "Dougherty",
+    "Powers",
+    "May",
+    "Steele",
+    "Teague",
+    "Vick",
+    "Gallagher",
+    "Solomon",
+    "Walsh",
+    "Monroe",
+    "Connolly",
+    "Hawkins",
+    "Middleton",
+    "Goldstein",
+    "Watts",
+    "Johnston",
+    "Weeks",
+    "Wilkerson",
+    "Barton",
+    "Walton",
+    "Hall",
+    "Ross",
+    "Woods",
+    "Mangum",
+    "Joseph",
+    "Rosenthal",
+    "Bowden",
+    "Underwood",
+    "Jones",
+    "Baker",
+    "Merritt",
+    "Cross",
+    "Cooper",
+    "Holmes",
+    "Sharpe",
+    "Morgan",
+    "Hoyle",
+    "Allen",
+    "Rich",
+    "Grant",
+    "Proctor",
+    "Diaz",
+    "Graham",
+    "Watkins",
+    "Hinton",
+    "Marsh",
+    "Hewitt",
+    "Branch",
+    "O'Brien",
+    "Case",
+    "Christensen",
+    "Parks",
+    "Hardin",
+    "Lucas",
+    "Eason",
+    "Davidson",
+    "Whitehead",
+    "Rose",
+    "Sparks",
+    "Moore",
+    "Pearson",
+    "Rodgers",
+    "Graves",
+    "Scarborough",
+    "Sutton",
+    "Sinclair",
+    "Bowman",
+    "Olsen",
+    "Love",
+    "McLean",
+    "Christian",
+    "Lamb",
+    "James",
+    "Chandler",
+    "Stout",
+    "Cowan",
+    "Golden",
+    "Bowling",
+    "Beasley",
+    "Clapp",
+    "Abrams",
+    "Tilley",
+    "Morse",
+    "Boykin",
+    "Sumner",
+    "Cassidy",
+    "Heath",
+    "Blanchard",
+    "McAllister",
+    "McKenzie",
+    "Byrne",
+    "Schroeder",
+    "Gross",
+    "Perkins",
+    "Robertson",
+    "Palmer",
+    "Brady",
+    "Rowe",
+    "Zhang",
+    "Hodge",
+    "Li",
+    "Justice",
+    "Glass",
+    "Willis",
+    "Hester",
+    "Floyd",
+    "Fischer",
+    "Norman",
+    "Chan",
+    "Hunt",
+    "Byrd",
+    "Lane",
+    "Kaplan",
+    "Heller",
+    "Jennings",
+    "Hanna",
+    "Locklear",
+    "Holloway",
+    "Glover",
+    "O'Donnell",
+    "Goldman",
+    "McKenna",
+    "Starr",
+    "Stone",
+    "McClure",
+    "Watson",
+    "Abbott",
+    "Singer",
+    "Farrell",
+    "Atkins",
+    "Sykes",
+    "Reid"]
+
+
+company_template = {"Name": "%s %s",
+                    "CompanyID": "%s",
+                    "Address": {"Street": "1 %s Way", "City": "%s Town", "Post": "%s"},
+                    "Country": "%s"
+                    }
+
+product_template = {"ProductID": "%s",
+                    "Name": "Product %s",
+                    "CompanyID": "%s",
+                    "Category": "%s",
+                    "Price": "%s",
+                    }
+
+employee_template = {"EmployeeID": "%s",
+                     "FullName": "%s %s",
+                     "Age": "%s",
+                     "Country": "%s",
+                     "Salary": "%s",
+                     "CompanyID": "%s"
+                     }
+
+customer_template = {"CustomerID": "%s",
+                     "FullName": "%s %s",
+                     "Age": "%s",
+                     "OwnedProducts": []
+                     }
+
+companies = []
+products = []
+employees = []
+customers = []
+
+countries = ["US", "GB", "DK", "CA", "MX", "AU", "FR", "IT", "DE", "KR", "JP", "CN"]
+
+company_types = ["Associates", "Organization", "Incorporated", "Limited", "Holdings"] 
+
+categories = ["Entertainment", "Education", "Household", "Electronics", "Tools", "Clothing"]
+
+    
+if __name__ == '__main__':
+    main()
