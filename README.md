@@ -1,10 +1,10 @@
-# FAkePI
+# fakepi
 
 ---
 
 ## Background
 
-FAkePI is a fake or mock HTTP API server. The data is randomly generated, but done in a way that is meant to resemble real data.
+fakepi is a fake or mock HTTP API server. The data is randomly generated, but done in a way that is meant to resemble real data.
 
 Each endpoint contains independent data but references data in the other endpoints so a client program can join the data. It was written to demonstrate the capabilities of a GraphQL server where data from various backend API's could be joined into one GraphQL response.
 
@@ -26,7 +26,7 @@ ENGINE Serving on http://127.0.0.1:8181
 ENGINE Bus STARTED
 ```
 
-By default is will listen only on 127.0.0.1:8181, but this can be changed in the main() function.
+By default it will listen only on 127.0.0.1:8181, but this can be changed in the main() function.
 
 Note the data is persistent while the process is running, but completely new data will be generated every time the program is run.
 
