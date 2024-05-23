@@ -72,4 +72,4 @@ Note: Since the data is random, valid names and ID's can be found by first query
 
 ## Performance
 
-FAkePI is not designed to be highly performant. However, it is light-weight and generates the data on startup so runtime performance should be consistent and could be useful in integration performance testing where deltas are evaluated.
+fakepi is not designed to be highly performant. However, it is light-weight and generates the data on startup so runtime performance should be consistent and could be useful in integration performance testing where deltas are evaluated.
