@@ -22,17 +22,17 @@ $ fakepi
 
 8<-----
 ENGINE Started monitor thread 'Autoreloader'.
-ENGINE Serving on http://127.0.0.1:8181
+ENGINE Serving on http://127.0.0.1:8080
 ENGINE Bus STARTED
 ```
 
-By default it will listen only on 127.0.0.1:8181, but this can be changed in the main() function.
+By default it will listen only on 127.0.0.1:8080, but this can be changed in the main() function or by providing BIND_ADDRESS and BIND_PORT environment variables. The Dockerfile sets the BIND_ADDRESS environment variable to "0.0.0.0" so the port can be exposed.
 
 Note the data is persistent while the process is running, but completely new data will be generated every time the program is run.
 
 ## Example
 ```
-$ http GET 127.0.0.1:8181/customer
+$ http GET 127.0.0.1:8080/customer
 
 8<-----
     {

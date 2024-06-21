@@ -25,6 +25,7 @@
 # this program. If not, see <https://www.gnu.org/licenses/>.
 
 import cherrypy
+import os
 import random
 import string
 
@@ -194,8 +195,16 @@ class Root(object):
 
 def main():
     gendata()
-    cherrypy.server.socket_host = '127.0.0.1'
-    cherrypy.server.socket_port = 8181
+    bind_addr = os.environ.get("BIND_ADDRESS")
+    if bind_addr is None:
+        bind_addr = '127.0.0.1'
+    bind_port = os.environ.get("BIND_PORT")
+    if bind_port is None:
+        bind_port = 8080
+    else:
+        bind_port = int(bind_port)
+    cherrypy.server.socket_host = bind_addr
+    cherrypy.server.socket_port = bind_port
     cherrypy.quickstart(Root())
 
 firstnames=[
